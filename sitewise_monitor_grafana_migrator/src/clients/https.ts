@@ -1,4 +1,5 @@
 import { request, RequestOptions } from 'https';
+import fetch, { RequestInfo, RequestInit } from 'node-fetch';
 
 /**
  * httpsRequest calls the https library to make HTTPS requests
@@ -18,7 +19,7 @@ export const httpsRequest = (options: RequestOptions, body?: any): Promise<any> 
 
       res.on('end', () => {
         try {
-          if (!!data) {
+          if (data) {
             const parsedData = JSON.parse(data);
             resolve(parsedData);
           } else {
@@ -47,3 +48,11 @@ export const HTTPMethod = {
   GET: 'GET',
   POST: 'POST',
 };
+
+export const fetchRequest = async (...options: Parameters<typeof fetch>): Promise<any> => {
+  const response = await fetch(...options);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}

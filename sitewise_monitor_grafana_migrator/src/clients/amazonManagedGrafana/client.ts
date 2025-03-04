@@ -10,13 +10,12 @@ const SITEWISE_DATASOURCE_NAME = 'SiteWise_Migrated_Datasource';
 /**
  * AmazonManagedGrafanaClient handles interaction with Amazon Managed Grafana resources (e.g. workspace)
  * and Grafana resources (e.g. datasources, folders, dashboards).
- * 
+ *
  * Has initialize() and tearDown() functions to set up and clean up auth for the Grafana HTTP APIs.
- * 
+ *
  * Handles high level resource migration from SiteWise Monitor portals to Grafana.
  */
 export class AmazonManagedGrafanaClient {
-
   private amazonManagedGrafanaClient: Grafana;
   private grafanaClient: GrafanaClient;
 
@@ -27,13 +26,7 @@ export class AmazonManagedGrafanaClient {
   private grafanaTokenId: string;
   private serviceAccountId: string;
 
-  constructor ({
-    region,
-    workspaceId,
-  }: {
-    region: string;
-    workspaceId: string;
-  }) {
+  constructor({ region, workspaceId }: { region: string; workspaceId: string }) {
     this.amazonManagedGrafanaClient = new Grafana({
       region,
     });
@@ -48,7 +41,7 @@ export class AmazonManagedGrafanaClient {
    */
   public migrateToGrafanaResources = async (portalResourceMap: PortalResourceMap) => {
     try {
-      // Initialize Grafana auth token and get workspace info 
+      // Initialize Grafana auth token and get workspace info
       await this.initialize();
 
       // Install SiteWise plugin in the workspace
@@ -79,7 +72,7 @@ export class AmazonManagedGrafanaClient {
       await this.tearDown();
       throw e;
     }
-  }
+  };
 
   /**
    * Need auth tokens for the Grafana HTTP request headers
@@ -93,7 +86,9 @@ export class AmazonManagedGrafanaClient {
     });
 
     if (!describeWorkspaceResponse.workspace?.endpoint) {
-      throw new Error(`Failed to describe the Amazon Managed Grafana workspace ${this.workspaceId}. Unable to find the workspace endpoint.`);
+      throw new Error(
+        `Failed to describe the Amazon Managed Grafana workspace ${this.workspaceId}. Unable to find the workspace endpoint.`,
+      );
     }
 
     this.workspaceEndpoint = describeWorkspaceResponse.workspace.endpoint;
@@ -106,7 +101,9 @@ export class AmazonManagedGrafanaClient {
     });
 
     if (!createServiceAccountResponse.id) {
-      throw new Error(`Failed to create a service account for the Amazon Managed Grafana workspace ${this.workspaceId}. Unable to find the service account ID.`);
+      throw new Error(
+        `Failed to create a service account for the Amazon Managed Grafana workspace ${this.workspaceId}. Unable to find the service account ID.`,
+      );
     }
 
     this.serviceAccountId = createServiceAccountResponse.id;
@@ -118,8 +115,13 @@ export class AmazonManagedGrafanaClient {
       secondsToLive: 900,
     });
 
-    if (!createServiceAccountTokenResponse.serviceAccountToken?.key || !createServiceAccountTokenResponse.serviceAccountToken?.id) {
-      throw new Error(`Failed to create a service account token for the Amazon Managed Grafana workspace ${this.workspaceId}. Unable to find the token.`);
+    if (
+      !createServiceAccountTokenResponse.serviceAccountToken?.key ||
+      !createServiceAccountTokenResponse.serviceAccountToken.id
+    ) {
+      throw new Error(
+        `Failed to create a service account token for the Amazon Managed Grafana workspace ${this.workspaceId}. Unable to find the token.`,
+      );
     }
 
     this.grafanaToken = createServiceAccountTokenResponse.serviceAccountToken.key;
@@ -150,7 +152,7 @@ export class AmazonManagedGrafanaClient {
         serviceAccountId: this.serviceAccountId,
       });
     }
-  }
+  };
 
   private createDatasource = async (name: string) => {
     // Check if datasource instance is already created
@@ -166,16 +168,14 @@ export class AmazonManagedGrafanaClient {
     }
 
     return datasourceUid;
-  }
+  };
 
   private migrateProjectsToFolders = async (projects: ProjectSummary[]) => {
     // Compare existing folders so we don't try creating ones that already exist
     const folders = await this.grafanaClient.listFolders();
 
     // Keep map of SiteWise projects to Grafana folders
-    const projectsToFoldersMap: {
-      [projectId: string]: string;
-    } = {};
+    const projectsToFoldersMap: Record<string, string> = {};
 
     for (const projectSummary of projects) {
       if (projectSummary.name && projectSummary.id) {
@@ -188,33 +188,38 @@ export class AmazonManagedGrafanaClient {
         } else {
           folderUid = folder.uid;
         }
-        
+
         if (folderUid) {
           projectsToFoldersMap[projectSummary.id] = folderUid;
         }
       }
     }
     return projectsToFoldersMap;
-  }
+  };
 
-  private migrateDashboards = async (
-    { dashboards, folderUid }:
-    { dashboards: DashboardSummary[], folderUid: string }
-  ) => {
+  private migrateDashboards = async ({
+    dashboards,
+    folderUid,
+  }: {
+    dashboards: DashboardSummary[];
+    folderUid: string;
+  }) => {
     // Compare existing dashboards so we don't try creating ones that already exist
     const grafanaDashboards = await this.grafanaClient.listDashboards();
 
     for (const dashboardSummary of dashboards) {
       if (dashboardSummary.name) {
         // Try to find matching Grafana dashboard
-        const dashboard = grafanaDashboards.find((grafanaDashboard) => grafanaDashboard.title === dashboardSummary.name);
+        const dashboard = grafanaDashboards.find(
+          (grafanaDashboard) => grafanaDashboard.title === dashboardSummary.name,
+        );
         if (!dashboard) {
           await this.grafanaClient.createDashboard({
             dashboardName: dashboardSummary.name,
             folderUid,
-          })
+          });
         }
       }
     }
-  }
+  };
 }

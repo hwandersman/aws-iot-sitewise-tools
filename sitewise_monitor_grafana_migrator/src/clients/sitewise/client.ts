@@ -1,29 +1,23 @@
 import { DashboardSummary, IoTSiteWise, ProjectSummary } from '@aws-sdk/client-iotsitewise';
 
 // Used to easily reference a project and its contents
-export type PortalResourceMap = {
-  [projectId: string]: {
-    projectSummary: ProjectSummary,
-    dashboardSummaries: DashboardSummary[]
-  },
-};
+export type PortalResourceMap = Record<
+  string,
+  {
+    projectSummary: ProjectSummary;
+    dashboardSummaries: DashboardSummary[];
+  }
+>;
 
 /**
  * IotSiteWiseClient is a wrapper for interacting with SiteWise resources for a given portal.
  */
 export class IotSiteWiseClient {
-
   private sitewiseClient: IoTSiteWise;
 
   private portalId: string;
 
-  constructor ({
-    region,
-    portalId,
-  }: {
-    region: string;
-    portalId: string;
-  }) {
+  constructor({ region, portalId }: { region: string; portalId: string }) {
     this.sitewiseClient = new IoTSiteWise({
       region,
     });
@@ -40,13 +34,13 @@ export class IotSiteWiseClient {
         const dashboards = await this.listDashboards(projectSummary.id);
         resourceMap[projectSummary.id] = {
           projectSummary,
-          dashboardSummaries: dashboards
+          dashboardSummaries: dashboards,
         };
       }
     }
 
     return resourceMap;
-  }
+  };
 
   // Lists all projects in a portal
   private listProjects = async () => {
@@ -62,10 +56,10 @@ export class IotSiteWiseClient {
       }
 
       nextToken = listProjectsResponse.nextToken;
-    } while (!!nextToken);
+    } while (nextToken);
 
     return projects;
-  }
+  };
 
   // Lists all dashboards in a project
   private listDashboards = async (projectId: string) => {
@@ -81,8 +75,14 @@ export class IotSiteWiseClient {
       }
 
       nextToken = listDashboardsResponse.nextToken;
-    } while (!!nextToken);
+    } while (nextToken);
 
     return dashboards;
-  }
+  };
+
+  public describeDashboard = async (dashboardId: string) => {
+    return await this.sitewiseClient.describeDashboard({
+      dashboardId,
+    });
+  };
 }

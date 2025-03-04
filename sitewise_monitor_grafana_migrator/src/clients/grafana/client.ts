@@ -1,26 +1,27 @@
 import { RequestOptions } from 'https';
 import { GrafanaPath } from './urlPaths';
-import { HTTPMethod, httpsRequest } from '../https';
+import { fetchRequest, HTTPMethod, httpsRequest } from '../https';
+import { HeadersInit } from 'node-fetch';
 
-const SITEWISE_PLUGIN_ID = 'grafana-iot-sitewise-datasource';
+export const SITEWISE_PLUGIN_ID = 'grafana-iot-sitewise-datasource';
 
 /**
  * GrafanaClient is a wrapper for Grafana HTTP API requests.
  * APIs require an auth token in the header and the Grafana workspace URL.
- * 
+ *
  * This script uses resource UIDs to reference the resource instead of the ID.
- * From the Grafana documentation: 
- *    The uid allows having consistent URLs for accessing dashboards and when 
+ * From the Grafana documentation:
+ *    The uid allows having consistent URLs for accessing dashboards and when
  *    syncing dashboards between multiple Grafana installs.
  */
 export class GrafanaClient {
-
   private requestHeaders: RequestOptions;
+  private fetchHeaders: HeadersInit;
 
   private workspaceEndpoint: string;
   private region: string;
 
-  constructor ({
+  constructor({
     authToken,
     workspaceEndpoint,
     region,
@@ -36,16 +37,18 @@ export class GrafanaClient {
         'content-type': 'application/json',
         accept: 'application/json',
       },
+    };
+    this.fetchHeaders = {
+      authorization: `Bearer ${authToken}`,
+      'content-type': 'application/json',
+      accept: 'application/json',
     }
     this.workspaceEndpoint = workspaceEndpoint;
     this.region = region;
   }
 
   // Util for setting up the HTTP request options with the path to the API
-  private requestOptions = (
-    { path, method }:
-    { path: string, method: string }
-  ): RequestOptions => {
+  private requestOptions = ({ path, method }: { path: string; method: string }): RequestOptions => {
     const { hostname, pathname } = new URL(`https://${this.workspaceEndpoint}${path}`);
     return {
       ...this.requestHeaders,
@@ -53,50 +56,54 @@ export class GrafanaClient {
       path: pathname,
       method,
     };
-  }
+  };
 
   // Install the IoT SiteWise datasource plugin in the Grafana workspace
   public installPlugin = async () => {
     console.log(`Installing plugin with ID ${SITEWISE_PLUGIN_ID}...`);
-    const installPluginOptions: RequestOptions = this.requestOptions(
+    const installPluginOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.InstallPlugin(SITEWISE_PLUGIN_ID),
+      method: HTTPMethod.POST,
+    });
+
+    const url = new URL(`https://${this.workspaceEndpoint}${GrafanaPath.InstallPlugin(SITEWISE_PLUGIN_ID)}`);
+
+    const installPluginResponse = await fetchRequest(
+      url,
       {
-        path: GrafanaPath.InstallPlugin(SITEWISE_PLUGIN_ID),
+        headers: this.fetchHeaders,
         method: HTTPMethod.POST,
       }
     );
 
-    const installPluginResponse = await httpsRequest(installPluginOptions);
+    // const installPluginResponse = await httpsRequest(installPluginOptions);
     // There will only be a message if the plugin is already installed
-    if (installPluginResponse && installPluginResponse.message) {
+    if (installPluginResponse?.message) {
       console.log(installPluginResponse.message);
     }
-  }
+  };
 
   // Get datasource instance by its name
   public getDatasourceByName = async (name: string) => {
-    const getDatasourceOptions: RequestOptions = this.requestOptions(
-      {
-        path: GrafanaPath.GetDatasource(name),
-        method: HTTPMethod.GET,
-      }
-    );
+    const getDatasourceOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.GetDatasource(name),
+      method: HTTPMethod.GET,
+    });
 
     const getDatasourceResponse = await httpsRequest(getDatasourceOptions);
     if (getDatasourceResponse) {
       return getDatasourceResponse.uid;
     }
-  }
+  };
 
   // Create a SiteWise datasource instance with a given name
   public createDatasource = async (name: string) => {
     console.log(`Creating datasource instance with name ${name}...`);
 
-    const createDatasourceOptions: RequestOptions = this.requestOptions(
-      {
-        path: GrafanaPath.CreateDatasource,
-        method: HTTPMethod.POST,
-      }
-    );
+    const createDatasourceOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.CreateDatasource,
+      method: HTTPMethod.POST,
+    });
 
     const data = {
       name,
@@ -105,9 +112,9 @@ export class GrafanaClient {
       jsonData: {
         authType: 'default',
         defaultRegion: this.region,
-      }
+      },
     };
-    
+
     const createDatasourceResponse = await httpsRequest(createDatasourceOptions, data);
     if (createDatasourceResponse) {
       if (createDatasourceResponse.message) {
@@ -115,16 +122,14 @@ export class GrafanaClient {
       }
       return createDatasourceResponse.datasource?.uid;
     }
-  }
+  };
 
   // List all folders in the Grafana workspace
   public listFolders = async () => {
-    const listFoldersOptions: RequestOptions = this.requestOptions(
-      {
-        path: GrafanaPath.GetFolder,
-        method: HTTPMethod.GET,
-      }
-    );
+    const listFoldersOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.GetFolder,
+      method: HTTPMethod.GET,
+    });
 
     const listFoldersResponse = await httpsRequest(listFoldersOptions);
 
@@ -132,18 +137,16 @@ export class GrafanaClient {
       return [...listFoldersResponse];
     }
     return [];
-  }
+  };
 
   // Create a folder with a given name
   public createFolder = async (name: string) => {
     console.log(`Creating folder with name ${name}...`);
 
-    const createFolderOptions: RequestOptions = this.requestOptions(
-      {
-        path: GrafanaPath.CreateFolder,
-        method: HTTPMethod.POST,
-      }
-    );
+    const createFolderOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.CreateFolder,
+      method: HTTPMethod.POST,
+    });
 
     const data = {
       title: name,
@@ -155,42 +158,35 @@ export class GrafanaClient {
       }
       return createFolderResponse.uid;
     }
-  }
+  };
 
   // List all dashboards in a Grafana workspace
   public listDashboards = async () => {
-    const searchOptions: RequestOptions = this.requestOptions(
-      {
-        path: GrafanaPath.Search,
-        method: HTTPMethod.GET,
-      }
-    );
+    const searchOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.Search,
+      method: HTTPMethod.GET,
+    });
 
     const searchResponse = await httpsRequest(searchOptions);
     return searchResponse.filter((dash) => dash.type === 'dash-db');
-  }
+  };
 
   // Create a dashboard with a given name for a given folder
   // TODO: Migrate dashboard content
-  public createDashboard = async (
-    { dashboardName, folderUid }:
-    { dashboardName: string, folderUid: string }
-  ) => {
+  public createDashboard = async ({ dashboardName, folderUid }: { dashboardName: string; folderUid: string }) => {
     console.log(`Creating dashboard with name ${dashboardName}...`);
 
-    const createDashboardOptions: RequestOptions = this.requestOptions(
-      {
-        path: GrafanaPath.CreateDashboard,
-        method: HTTPMethod.POST,
-      }
-    );
+    const createDashboardOptions: RequestOptions = this.requestOptions({
+      path: GrafanaPath.CreateDashboard,
+      method: HTTPMethod.POST,
+    });
 
     const data = {
       dashboard: {
         title: dashboardName,
       },
       folderUid,
-      message: 'IoT SiteWise auto-created dashboard', 
+      message: 'IoT SiteWise auto-created dashboard',
     };
     const createDashboardResponse = await httpsRequest(createDashboardOptions, data);
     if (createDashboardResponse) {
@@ -199,5 +195,5 @@ export class GrafanaClient {
       }
       return createDashboardResponse.uid;
     }
-  }
+  };
 }

@@ -7,17 +7,9 @@ import { parseArgs } from './parseInput';
  * portal resources and convert them to Amazon Managed Grafana resources.
  */
 
-const { 
-  portalId,
-  region,
-  workspaceId,
-} = parseArgs();
+const { portalId, region, workspaceId } = parseArgs();
 
 const main = async () => {
-  if (!workspaceId) {
-    throw 'Missing workspaceId';
-  }
-
   // Client wrapper to fetch all portal resources
   const sitewiseClient = new IotSiteWiseClient({
     region,
@@ -25,22 +17,15 @@ const main = async () => {
   });
 
   const portalResourceMap = await sitewiseClient.getPortalResources();
-  
+
   // Client wrapper to create Grafana resources
   const amazonManagedGrafanaClient = new AmazonManagedGrafanaClient({
     region,
     workspaceId,
   });
-  
-  // Step 3. Create Grafana resources
+
+  // Create Grafana resources
   await amazonManagedGrafanaClient.migrateToGrafanaResources(portalResourceMap);
 };
 
 void main();
-
-
-
-
-
-
-
